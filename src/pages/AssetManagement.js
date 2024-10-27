@@ -1,22 +1,36 @@
-// src/pages/AssetManagementPage.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Typography, Box, Paper, List, ListItem, ListItemText } from '@mui/material';
+import { getTeamAssets } from '../services/AssetService';
 
 const AssetManagementPage = () => {
   const [ownedAssets, setOwnedAssets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const navigate = useNavigate();
 
-  // Simulate fetching owned assets from an API
+  // Fetch owned assets from OpenMetadata API
   useEffect(() => {
-    // Replace with actual API call
     const fetchOwnedAssets = async () => {
-      const data = [
-        { id: 1, name: 'Dataset A', description: 'Owned data asset A' },
-        { id: 2, name: 'Dataset B', description: 'Owned data asset B' },
-      ];
-      setOwnedAssets(data);
+      setLoading(true);
+      try {
+        const teamName = sessionStorage.getItem('teamName');
+        if (!teamName) {
+          console.error('Team name is missing or not set.');
+          setError(true);
+          setLoading(false);
+          return;
+        }
+        const fetchedAssets = await getTeamAssets(teamName);
+        setOwnedAssets(fetchedAssets);
+        setLoading(false);
+      } catch (e) {
+        console.error('Failed to fetch assets', e);
+        setError(true);
+        setLoading(false);
+      }
     };
+
     fetchOwnedAssets();
   }, []);
 
@@ -24,6 +38,23 @@ const AssetManagementPage = () => {
     // Navigate to the MetadataSuggestions page with assetId
     navigate(`/suggestions/${assetId}`);
   };
+
+  if (loading) {
+    return <Typography>Loading...</Typography>;
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ padding: 3 }}>
+        <Typography color="error">
+          Error occurred while fetching assets or team name is missing. Please log in again.
+        </Typography>
+        <Button variant="contained" color="primary" onClick={() => navigate('/login')}>
+          Go to Login
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ padding: 3 }}>
@@ -36,8 +67,8 @@ const AssetManagementPage = () => {
             {ownedAssets.map((asset) => (
               <ListItem key={asset.id}>
                 <ListItemText
-                  primary={asset.name}
-                  secondary={asset.description}
+                  primary={asset.displayName}
+                  secondary={`Last updated: ${asset.updatedAt}`}
                 />
                 <Button
                   variant="contained"

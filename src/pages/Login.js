@@ -1,35 +1,29 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { TextField, Button, Typography, Box, Paper } from '@mui/material';
+import { loginUser } from '../services/UserService';
 
 const Login = ({ onLogin }) => {
   const navigate = useNavigate();
-
-  // Hardcoded credentials for now
-  const hardcodedUser = {
-    username: 'admin',
-    password: 'password123',
-  };
-
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleLogin = (e) => {
-    e.preventDefault();  // Prevent the form from refreshing the page
-
-    // Check hardcoded credentials
-    if (username === hardcodedUser.username && password === hardcodedUser.password) {
-      // Store authentication state in sessionStorage
+  const handleLogin = async (e) => {
+    e.preventDefault();
+  
+    try {
+      // Call loginUser with separate arguments instead of an object
+      await loginUser(username, password);
       sessionStorage.setItem('isAuthenticated', 'true');
-      // Trigger the onLogin function to update authentication state in App.js
       onLogin();
-      // Navigate to the asset management page after successful login
       navigate('/asset-management');
-    } else {
-      setError(true);  // Show error if credentials are incorrect
+    } catch (error) {
+      setError('Invalid username or password');
+      console.error('Error logging in:', error);
     }
   };
+  
 
   return (
     <Box
@@ -63,13 +57,16 @@ const Login = ({ onLogin }) => {
           />
           {error && (
             <Typography color="error" variant="body2" align="center">
-              Incorrect username or password.
+              {error}
             </Typography>
           )}
           <Button variant="contained" color="primary" type="submit" fullWidth sx={{ mt: 3 }}>
             Login
           </Button>
         </form>
+        <Typography variant="body2" align="center" sx={{ mt: 2 }}>
+          Don't have an account? <Link to="/register">Register here</Link>
+        </Typography>
       </Paper>
     </Box>
   );

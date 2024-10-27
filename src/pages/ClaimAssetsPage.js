@@ -1,27 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { fetchUnownedAssets } from '../api/OpenMetadataAPI';
-import { Box, Paper, Typography, Button } from '@mui/material';
+import { Box, Paper, List, ListItem, ListItemText, Typography, Button } from '@mui/material';
+import { claimAsset } from '../api/FastAPI'; // Import claimAsset API call
 
 const ClaimAssetsPage = () => {
-  const apiToken = sessionStorage.getItem('apiToken'); // Retrieve the API token from sessionStorage
   const [assets, setAssets] = useState([]);
 
+  // Hardcoded user information
+  const userId = 'user_123'; // You can replace this with actual user data in future
+
   const fetchAssets = async () => {
-    if (apiToken) {
-      const unownedAssets = await fetchUnownedAssets(apiToken); // Use the apiToken from sessionStorage
-      setAssets(unownedAssets);
-    } else {
-      console.error('API Token is not available');
-    }
+    const unownedAssets = await fetchUnownedAssets();
+    setAssets(unownedAssets);
   };
 
   useEffect(() => {
-    fetchAssets(); // Fetch assets when component mounts
-  }, [apiToken]);
+    fetchAssets();
+  }, []);
 
-  const handleClaim = (assetId) => {
-    console.log(`Claiming asset with ID: ${assetId}`);
-    // Add logic to claim the asset
+  const handleClaim = async (assetId) => {
+    try {
+      const claimData = {
+        userId: userId, // Hardcoded userId
+      };
+
+      // Call API to claim the asset
+      await claimAsset(assetId, claimData);
+
+      // Optionally, refresh the asset list after a claim
+      fetchAssets();
+
+      console.log(`Asset with ID ${assetId} claimed by ${userId}`);
+    } catch (error) {
+      console.error('Error claiming asset:', error);
+    }
   };
 
   return (
@@ -30,51 +42,45 @@ const ClaimAssetsPage = () => {
         Claim Assets
       </Typography>
 
-      {/* If no assets are available */}
       {assets.length === 0 ? (
         <Typography variant="body1">No unowned assets available for claim.</Typography>
       ) : (
-        <Box
-          sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 2, // Spacing between items
-            justifyContent: 'center',
-          }}
-        >
+        <List sx={{ display: 'flex', flexWrap: 'wrap' }}>
           {assets.map((asset) => (
-            <Paper
-              key={asset.id}
-              elevation={3}
-              sx={{
-                padding: 2,
-                flex: '1 1 calc(33.333% - 16px)', // Each item takes 1/3rd of the row, minus 16px for spacing
-                minWidth: '300px', // Minimum width for smaller screens
-                boxSizing: 'border-box', // Ensure padding is included in width
-                margin: '8px', // Add margin for spacing
-              }}
-            >
-              <Typography variant="h6">{asset.displayName || 'Unnamed Asset'}</Typography>
-              <Typography variant="body2">
-                <strong>ID:</strong> {asset.id}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Last Updated:</strong> {asset.updatedAt}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Data Type:</strong> {asset.dataType || 'Unknown'}
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => handleClaim(asset.id)}
-                sx={{ marginTop: 2 }}
-              >
-                Claim
-              </Button>
-            </Paper>
+            <ListItem key={asset.id} sx={{ width: { xs: '100%', sm: '48%', md: '30%' }, marginBottom: 2 }}>
+              <Paper elevation={2} sx={{ padding: 2, width: '100%' }}>
+                <ListItemText
+                  primary={
+                    <Typography variant="h6">
+                      {asset.displayName || 'Unnamed Asset'}
+                    </Typography>
+                  }
+                  secondary={
+                    <>
+                      <Typography variant="body2">
+                        <strong>ID:</strong> {asset.id}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Last Updated:</strong> {asset.updatedAt}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Data Type:</strong> {asset.dataType || 'Unknown'}
+                      </Typography>
+                    </>
+                  }
+                />
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => handleClaim(asset.id)}
+                  sx={{ marginTop: 2 }}
+                >
+                  Claim
+                </Button>
+              </Paper>
+            </ListItem>
           ))}
-        </Box>
+        </List>
       )}
     </Box>
   );
