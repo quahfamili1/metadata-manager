@@ -14,7 +14,22 @@ import {
   Tooltip,
   CircularProgress
 } from '@mui/material';
-import { fetchUnownedAssets, claimAsset } from '../api/FastAPI';
+import { fetchUnownedAssets, updateAsset } from '../services/AssetService';
+
+const OPENMETADATA_URL = "http://localhost:8585"; // Replace with your actual OpenMetadata URL
+
+const singularTypeMap = {
+  searchIndexes: "searchIndex",
+  tables: "table",
+  dashboards: "dashboard",
+  storedProcedures: "storedProcedure",
+  docStore: "docStore",
+  dataProducts: "dataProduct",
+  mlmodels: "mlmodel",
+  pipelines: "pipeline",
+  containers: "container",
+  topics: "topic"
+};
 
 const ClaimAssetsPage = () => {
   const [assets, setAssets] = useState([]);
@@ -42,16 +57,28 @@ const ClaimAssetsPage = () => {
     fetchAssets();
   }, []);
 
+  const constructHref = (type, fullyQualifiedName) => {
+    const singularType = singularTypeMap[type] || type; // Map plural to singular type
+    return `${OPENMETADATA_URL}/${singularType}/${fullyQualifiedName}`;
+  };
+
   const handleClaim = async (assetId, assetType) => {
+    const confirmClaim = window.confirm(`Are you sure you want to claim asset ID ${assetId}?`);
+    if (!confirmClaim) return;
+
     try {
-      const success = await claimAsset(assetId, assetType);
-      if (success) {
+      const updateData = { owners: true };
+      console.log("Attempting to claim asset with ID:", assetId, "and Type:", assetType);
+  
+      const response = await updateAsset(assetType, assetId, updateData);
+      
+      if (response.success) {
         setSnackbar({
           open: true,
           message: `Successfully claimed asset ID ${assetId}`,
           severity: 'success'
         });
-        setAssets(assets.filter(asset => asset.id !== assetId)); // Remove claimed asset from the list
+        setAssets(assets.filter(asset => asset.id !== assetId));
       } else {
         throw new Error('Failed to update asset ownership');
       }
@@ -64,7 +91,7 @@ const ClaimAssetsPage = () => {
       console.error('Error claiming asset:', error);
     }
   };
-
+  
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
@@ -84,53 +111,66 @@ const ClaimAssetsPage = () => {
           <Typography variant="body1" component="div">No unowned assets available for claim.</Typography>
         ) : (
           <List sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {assets.map((asset) => (
-              <ListItem
-                key={asset.id}
-                sx={{
-                  width: { xs: '100%', sm: '48%', md: '30%' },
-                  marginBottom: 2
-                }}
-              >
-                <Paper elevation={2} sx={{ padding: 2, width: '100%' }}>
-                  <Tooltip title={asset.displayName || 'Unnamed Asset'}>
-                    <ListItemText
-                      primary={
-                        <Typography
-                          variant="h6"
-                          component="span"
-                          sx={{
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            display: 'block',
-                            maxWidth: '100%',
-                            wordBreak: 'break-all',
-                          }}
-                        >
-                          {asset.displayName || 'Unnamed Asset'}
-                        </Typography>
-                      }
-                      secondary={
-                        <>
-                          <Typography variant="body2" component="div"><strong>ID:</strong> {asset.id}</Typography>
-                          <Typography variant="body2" component="div"><strong>Last Updated:</strong> {new Date(asset.updatedAt).toLocaleString()}</Typography>
-                          <Typography variant="body2" component="div"><strong>Data Type:</strong> {asset.dataType || 'Unknown'}</Typography>
-                        </>
-                      }
-                    />
-                  </Tooltip>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => handleClaim(asset.id, asset.dataType)}
-                    sx={{ marginTop: 2 }}
-                  >
-                    Claim
-                  </Button>
-                </Paper>
-              </ListItem>
-            ))}
+            {assets.map((asset) => {
+              const assetLink = constructHref(asset.dataType, asset.fullyQualifiedName);
+              return (
+                <ListItem
+                  key={asset.id}
+                  sx={{
+                    width: { xs: '100%', sm: '48%', md: '30%' },
+                    marginBottom: 2
+                  }}
+                >
+                  <Paper elevation={2} sx={{ padding: 2, width: '100%' }}>
+                    <Tooltip title={asset.displayName || 'Unnamed Asset'}>
+                      <ListItemText
+                        primary={
+                          <Typography
+                            variant="h6"
+                            component="span"
+                            sx={{
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: 'block',
+                              maxWidth: '100%',
+                              wordBreak: 'break-all',
+                            }}
+                          >
+                            {asset.displayName || 'Unnamed Asset'}
+                          </Typography>
+                        }
+                        secondary={
+                          <>
+                            <Typography variant="body2" component="div"><strong>ID:</strong> {asset.id}</Typography>
+                            <Typography variant="body2" component="div"><strong>Last Updated:</strong> {new Date(asset.updatedAt).toLocaleString()}</Typography>
+                            <Typography variant="body2" component="div"><strong>Data Type:</strong> {asset.dataType || 'Unknown'}</Typography>
+                          </>
+                        }
+                      />
+                    </Tooltip>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      href={assetLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{ marginTop: 2 }}
+                    >
+                      Asset Link
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={() => handleClaim(asset.id, asset.dataType)}
+                      sx={{ marginTop: 2, marginLeft: 1 }}
+                    >
+                      Claim
+                    </Button>
+                  </Paper>
+                </ListItem>
+              );
+            })}
           </List>
         )
       )}

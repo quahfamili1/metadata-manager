@@ -21,12 +21,12 @@ const AssetManagementPage = () => {
   const [error, setError] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch owned assets from the API
   useEffect(() => {
     const fetchOwnedAssets = async () => {
       setLoading(true);
       try {
         const teamName = sessionStorage.getItem('teamName');
+        console.log("Team name from session:", teamName);  // Add this line to verify the value
         if (!teamName) {
           console.error('Team name is missing or not set.');
           setError(true);
@@ -34,7 +34,7 @@ const AssetManagementPage = () => {
           return;
         }
         const fetchedAssets = await getTeamAssets(teamName);
-        setOwnedAssets(fetchedAssets.team_assets); // Ensure data is accessed correctly
+        setOwnedAssets(fetchedAssets.team_assets);
         setLoading(false);
       } catch (e) {
         console.error('Failed to fetch assets', e);
@@ -42,9 +42,10 @@ const AssetManagementPage = () => {
         setLoading(false);
       }
     };
-
+  
     fetchOwnedAssets();
   }, []);
+  
 
   const handleViewSuggestions = (assetId) => {
     navigate(`/suggestions/${assetId}`);

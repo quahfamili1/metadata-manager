@@ -19,44 +19,59 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ClearIcon from '@mui/icons-material/Clear';
-import { createTemporaryAsset } from '../api/FastAPI';
+import { createTemporaryAsset } from '../services/AssetService';
 
 const CSVUpload = () => {
   const [parsedData, setParsedData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Handle CSV file upload and parse
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      Papa.parse(file, {
+  // Parse CSV data and handle any errors
+  const parseCSV = (csvData) => {
+    try {
+      const parsed = Papa.parse(csvData, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => {
-          setParsedData(results.data);
-        },
-        error: (error) => {
-          console.error("Error parsing CSV:", error);
-          setSnackbar({ open: true, message: 'Error parsing CSV file.', severity: 'error' });
-        }
       });
+      if (parsed.errors.length > 0) {
+        console.error("CSV Parsing Error:", parsed.errors);
+        setSnackbar({ open: true, message: "CSV Parsing Error", severity: "error" });
+      }
+      return parsed.data;
+    } catch (error) {
+      console.error("Error parsing CSV:", error);
+      setSnackbar({ open: true, message: "Error parsing CSV", severity: "error" });
+      return [];
     }
   };
 
-  // Submit parsed data to backend to create a temporary asset
+  // Handle CSV file upload
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const csvData = e.target.result;
+      const data = parseCSV(csvData); // Parse CSV and set state
+      setParsedData(data);
+    };
+    reader.readAsText(file);
+  };
+
+  // Submit parsed data to backend for each row
   const handleSubmit = async () => {
     setLoading(true);
     try {
       for (const row of parsedData) {
-        await createTemporaryAsset({
+        const payload = {
           title: row.Title,
           description: row.Description,
-          attributes: row.Attributes
-        });
+          attributes: row.Attributes ? row.Attributes.split(',') : [], // Convert attributes to array if necessary
+        };
+        console.log("Payload being sent to createTemporaryAsset:", payload); // Debug log
+        await createTemporaryAsset(payload);
       }
       setSnackbar({ open: true, message: 'Assets created successfully!', severity: 'success' });
-      setParsedData([]); // Clear the data after successful upload
+      setParsedData([]); // Clear data after successful upload
     } catch (error) {
       console.error("Error submitting assets:", error);
       setSnackbar({ open: true, message: 'Failed to create assets. Please try again.', severity: 'error' });
