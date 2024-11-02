@@ -1,31 +1,7 @@
 // src/services/AssetService.js
-import axios from 'axios';
+import axiosInstance from '../api/FastAPI';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8005';
-
-// Fetch asset by ID
-export const getAssetById = async (assetId) => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/assets/${assetId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching asset:', error);
-    throw error;
-  }
-};
-
-// Update asset
-export const updateAsset = async (assetId, assetData) => {
-  try {
-    const response = await axios.put(`${API_BASE_URL}/assets/${assetId}`, assetData);
-    return response.data;
-  } catch (error) {
-    console.error('Error updating asset:', error);
-    throw error;
-  }
-};
-
-// Fetch team-owned assets from OpenMetadata API
+// Fetch assets for a team
 export const getTeamAssets = async (teamName) => {
   try {
     const API_TOKEN = sessionStorage.getItem('apiToken');
@@ -34,9 +10,9 @@ export const getTeamAssets = async (teamName) => {
       return [];
     }
 
-    const response = await axios.get(`${API_BASE_URL}/assets/team/${teamName}`, {
+    // Use the axios instance with the correct endpoint and Authorization header
+    const response = await axiosInstance.get(`/assets/teams/${teamName}`, {
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_TOKEN}`,
       },
     });
@@ -45,5 +21,38 @@ export const getTeamAssets = async (teamName) => {
   } catch (error) {
     console.error('Error fetching team assets:', error);
     throw error;
+  }
+};
+
+// Update asset ownership in OpenMetadata
+export const updateAssetOwner = async (assetId, teamName) => {
+  try {
+    const API_TOKEN = sessionStorage.getItem('apiToken');
+    if (!API_TOKEN) {
+      console.error('API token is missing or not set.');
+      return { success: false };
+    }
+
+    const response = await axiosInstance.patch(
+      `/assets/tables/${assetId}/owner`,
+      { team: teamName }, // Payload specifying the team ownership
+      {
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json-patch+json',
+        },
+      }
+    );
+
+    if (response.status === 200) {
+      console.log(`Asset ${assetId} ownership updated successfully.`);
+      return { success: true };
+    } else {
+      console.error('Failed to update asset ownership.');
+      return { success: false };
+    }
+  } catch (error) {
+    console.error('Error updating asset ownership:', error);
+    return { success: false };
   }
 };

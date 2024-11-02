@@ -1,7 +1,19 @@
+// src/components/AssetManagementPage.js
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Typography, Box, Paper, List, ListItem, ListItemText } from '@mui/material';
+import {
+  Box,
+  Paper,
+  List,
+  ListItem,
+  ListItemText,
+  Typography,
+  Button,
+  Tooltip
+} from '@mui/material';
 import { getTeamAssets } from '../services/AssetService';
+import CSVUpload from '../components/CSVUpload'; // Import CSVUpload component
 
 const AssetManagementPage = () => {
   const [ownedAssets, setOwnedAssets] = useState([]);
@@ -9,7 +21,7 @@ const AssetManagementPage = () => {
   const [error, setError] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch owned assets from OpenMetadata API
+  // Fetch owned assets from the API
   useEffect(() => {
     const fetchOwnedAssets = async () => {
       setLoading(true);
@@ -22,7 +34,7 @@ const AssetManagementPage = () => {
           return;
         }
         const fetchedAssets = await getTeamAssets(teamName);
-        setOwnedAssets(fetchedAssets);
+        setOwnedAssets(fetchedAssets.team_assets); // Ensure data is accessed correctly
         setLoading(false);
       } catch (e) {
         console.error('Failed to fetch assets', e);
@@ -35,7 +47,6 @@ const AssetManagementPage = () => {
   }, []);
 
   const handleViewSuggestions = (assetId) => {
-    // Navigate to the MetadataSuggestions page with assetId
     navigate(`/suggestions/${assetId}`);
   };
 
@@ -58,32 +69,70 @@ const AssetManagementPage = () => {
 
   return (
     <Box sx={{ padding: 3 }}>
-      <Paper elevation={3} sx={{ padding: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Manage Your Data Assets
-        </Typography>
-        {ownedAssets.length > 0 ? (
-          <List>
-            {ownedAssets.map((asset) => (
-              <ListItem key={asset.id}>
-                <ListItemText
-                  primary={asset.displayName}
-                  secondary={`Last updated: ${asset.updatedAt}`}
-                />
+      <Typography variant="h4" gutterBottom>
+        Manage Your Data Assets
+      </Typography>
+
+      {/* CSV Upload Section */}
+      <Box sx={{ marginBottom: 3 }}>
+        <CSVUpload />
+      </Box>
+
+      {ownedAssets.length === 0 ? (
+        <Typography>No owned assets found.</Typography>
+      ) : (
+        <List sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          {ownedAssets.map((asset) => (
+            <ListItem key={asset.id} sx={{ width: { xs: '100%', sm: '48%', md: '30%' }, marginBottom: 2 }}>
+              <Paper elevation={2} sx={{ padding: 2, width: '100%' }}>
+                <Tooltip title={asset.display_name || 'Unnamed Asset'}>
+                  <ListItemText
+                    primary={
+                      <Typography
+                        variant="h6"
+                        component="span"
+                        sx={{
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: 'block',
+                          maxWidth: '100%',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {asset.display_name || 'Unnamed Asset'}
+                      </Typography>
+                    }
+                    secondary={
+                      <>
+                        <Typography variant="body2" component="span">
+                          <strong>Type:</strong> {asset.type || 'N/A'}
+                        </Typography>
+                        <br />
+                        <Typography variant="body2" component="span">
+                          <strong>Description:</strong> {asset.description || 'No description available'}
+                        </Typography>
+                        <br />
+                        <Typography variant="body2" component="span">
+                          <strong>Last updated:</strong> {new Date(asset.updated_at).toLocaleString()}
+                        </Typography>
+                      </>
+                    }
+                  />
+                </Tooltip>
                 <Button
                   variant="contained"
                   color="secondary"
                   onClick={() => handleViewSuggestions(asset.id)}
+                  sx={{ marginTop: 2 }}
                 >
                   View Metadata Suggestions
                 </Button>
-              </ListItem>
-            ))}
-          </List>
-        ) : (
-          <Typography>No owned assets found.</Typography>
-        )}
-      </Paper>
+              </Paper>
+            </ListItem>
+          ))}
+        </List>
+      )}
     </Box>
   );
 };

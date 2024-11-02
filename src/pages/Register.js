@@ -10,20 +10,22 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [team, setTeam] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    setError('');  // Clear any previous error
+
     try {
       await createUser({ username, password, email, team });
-      setSuccess(true);  // Set success to true
+      setSuccess(true);  // Show success message
       setTimeout(() => {
         navigate('/');  // Redirect to login page after 2 seconds
       }, 2000);
     } catch (error) {
       console.error('Error registering user:', error);
-      setError(true);
+      setError(error.response?.data?.detail || 'Error occurred during registration. Please try again.');
     }
   };
 
@@ -52,6 +54,7 @@ const Register = () => {
             label="Email"
             fullWidth
             margin="normal"
+            type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -75,7 +78,7 @@ const Register = () => {
           />
           {error && (
             <Typography color="error" variant="body2" align="center">
-              Error occurred while registering. Please try again.
+              {error}
             </Typography>
           )}
           {success && (
