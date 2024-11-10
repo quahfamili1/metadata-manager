@@ -4,7 +4,7 @@ import axiosInstance from '../api/FastAPI';
 // Fetch assets for a team
 export const getTeamAssets = async (teamName) => {
   try {
-    const response = await axiosInstance.get(`/teams/${teamName}`);
+    const response = await axiosInstance.get(`/team-assets/${teamName}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching team assets:', error);

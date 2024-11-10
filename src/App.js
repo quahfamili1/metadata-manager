@@ -5,7 +5,7 @@ import ClaimAssetsPage from './pages/ClaimAssetsPage';
 import MetadataSuggestions from './pages/MetadataSuggestions';
 import Login from './pages/Login';
 import AdminSettingsPage from './pages/AdminSettingsPage';
-import Register from './pages/Register'; // Make sure this import path is correct
+import Register from './pages/Register';
 import { AppBar, Toolbar, Button, CssBaseline } from '@mui/material';
 import { GlobalProvider } from './context/GlobalContext';
 import { AuthProvider } from './context/AuthContext';
@@ -14,11 +14,20 @@ function App() {
   const [authenticated, setAuthenticated] = useState(
     sessionStorage.getItem('isAuthenticated') === 'true'
   );
+  const [userRole, setUserRole] = useState(sessionStorage.getItem('userRole') || '');
 
-  // Sync authentication state on component mount
+  // Sync authentication and role state on component mount
   useEffect(() => {
     setAuthenticated(sessionStorage.getItem('isAuthenticated') === 'true');
+    setUserRole(sessionStorage.getItem('userRole'));
   }, []);
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('isAuthenticated');
+    sessionStorage.removeItem('userRole');
+    setAuthenticated(false);
+    setUserRole('');
+  };
 
   return (
     <GlobalProvider>
@@ -31,14 +40,10 @@ function App() {
                 <Toolbar>
                   <Button color="inherit" href="/claim-assets">Claim Assets</Button>
                   <Button color="inherit" href="/asset-management">Asset Management</Button>
-                  <Button color="inherit" href="/admin-settings">Admin Settings</Button>
-                  <Button
-                    color="inherit"
-                    onClick={() => {
-                      sessionStorage.removeItem('isAuthenticated');
-                      setAuthenticated(false);
-                    }}
-                  >
+                  {userRole === 'admin' && (
+                    <Button color="inherit" href="/admin-settings">Admin Settings</Button>
+                  )}
+                  <Button color="inherit" onClick={handleLogout}>
                     Logout
                   </Button>
                 </Toolbar>
@@ -52,7 +57,13 @@ function App() {
                   authenticated ? (
                     <Navigate to="/asset-management" />
                   ) : (
-                    <Login onLogin={() => setAuthenticated(true)} />
+                    <Login
+                      onLogin={(role) => {
+                        setAuthenticated(true);
+                        setUserRole(role);
+                        sessionStorage.setItem('userRole', role); // Store user role
+                      }}
+                    />
                   )
                 }
               />
@@ -69,10 +80,12 @@ function App() {
                 path="/suggestions/:assetId"
                 element={authenticated ? <MetadataSuggestions /> : <Navigate to="/" />}
               />
-              <Route
-                path="/admin-settings"
-                element={authenticated ? <AdminSettingsPage /> : <Navigate to="/" />}
-              />
+              {userRole === 'admin' && (
+                <Route
+                  path="/admin-settings"
+                  element={authenticated ? <AdminSettingsPage /> : <Navigate to="/" />}
+                />
+              )}
             </Routes>
           </Router>
         </>

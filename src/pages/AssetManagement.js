@@ -10,7 +10,8 @@ import {
   ListItemText,
   Typography,
   Button,
-  Tooltip
+  Tooltip,
+  Link,
 } from '@mui/material';
 import { getTeamAssets } from '../services/AssetService';
 import CSVUpload from '../components/CSVUpload';
@@ -20,10 +21,10 @@ const AssetManagementPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [newlyUploadedAssets, setNewlyUploadedAssets] = useState([]);
+  const [expandedDescriptions, setExpandedDescriptions] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Fetch stored asset IDs for newly uploaded assets
     const newAssets = JSON.parse(sessionStorage.getItem('newlyUploadedAssets') || '[]');
     setNewlyUploadedAssets(newAssets);
 
@@ -38,7 +39,14 @@ const AssetManagementPage = () => {
           return;
         }
         const fetchedAssets = await getTeamAssets(teamName);
-        setOwnedAssets(fetchedAssets.team_assets);
+
+        const sortedAssets = fetchedAssets.team_assets.sort((a, b) => {
+          const isANew = newAssets.includes(a.id);
+          const isBNew = newAssets.includes(b.id);
+          return isANew === isBNew ? 0 : isANew ? -1 : 1;
+        });
+
+        setOwnedAssets(sortedAssets);
         setLoading(false);
       } catch (e) {
         console.error('Failed to fetch assets', e);
@@ -46,9 +54,16 @@ const AssetManagementPage = () => {
         setLoading(false);
       }
     };
-  
+
     fetchOwnedAssets();
   }, []);
+
+  const toggleDescription = (assetId) => {
+    setExpandedDescriptions((prev) => ({
+      ...prev,
+      [assetId]: !prev[assetId],
+    }));
+  };
 
   const handleViewSuggestions = (assetId) => {
     navigate(`/suggestions/${assetId}`);
@@ -87,18 +102,29 @@ const AssetManagementPage = () => {
       ) : (
         <List sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
           {ownedAssets.map((asset) => {
-            const isNew = newlyUploadedAssets.includes(asset.id); // Check if asset is new
+            const isNew = newlyUploadedAssets.includes(asset.id);
+            const isExpanded = expandedDescriptions[asset.id] || false;
+            const descriptionText = asset.description || 'No description available';
+            const truncatedDescription = descriptionText.length > 200 && !isExpanded
+              ? `${descriptionText.slice(0, 200)}...`
+              : descriptionText;
 
             return (
-              <ListItem key={asset.id} sx={{ width: { xs: '100%', sm: '48%', md: '30%' }, marginBottom: 2 }}>
+              <ListItem
+                key={asset.id}
+                sx={{
+                  width: { xs: '100%', sm: '48%', md: '30%' },
+                  marginBottom: 2,
+                }}
+              >
                 <Paper
                   elevation={2}
                   sx={{
                     padding: 2,
                     width: '100%',
-                    backgroundColor: isNew ? '#e0f7e0 !important' : 'inherit', // Light green background for new assets
-                    border: isNew ? '2px solid #4CAF50' : 'none', // Green border for better visual cue
-                    boxShadow: isNew ? '0px 0px 8px rgba(76, 175, 80, 0.5)' : 'none' // Additional shadow for prominence
+                    backgroundColor: isNew ? '#e0f7e0' : 'white', // Subtle green for new, white for others
+                    border: '1px solid #ccc', // Light border for all cards
+                    boxShadow: isNew ? '0px 0px 8px rgba(76, 175, 80, 0.5)' : '0px 0px 8px rgba(0, 0, 0, 0.1)',
                   }}
                 >
                   <Tooltip title={asset.display_name || 'Unnamed Asset'}>
@@ -113,7 +139,6 @@ const AssetManagementPage = () => {
                             textOverflow: 'ellipsis',
                             display: 'block',
                             maxWidth: '100%',
-                            wordBreak: 'break-all',
                           }}
                         >
                           {asset.display_name || 'Unnamed Asset'}
@@ -126,7 +151,17 @@ const AssetManagementPage = () => {
                           </Typography>
                           <br />
                           <Typography variant="body2" component="span">
-                            <strong>Description:</strong> {asset.description || 'No description available'}
+                            <strong>Description:</strong> {truncatedDescription}
+                            {descriptionText.length > 200 && (
+                              <Link
+                                component="button"
+                                variant="body2"
+                                onClick={() => toggleDescription(asset.id)}
+                                sx={{ marginLeft: 1, cursor: 'pointer', color: 'primary.main' }}
+                              >
+                                {isExpanded ? 'See less' : 'See more'}
+                              </Link>
+                            )}
                           </Typography>
                           <br />
                           <Typography variant="body2" component="span">
