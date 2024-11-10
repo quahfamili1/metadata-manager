@@ -19,19 +19,21 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ClearIcon from '@mui/icons-material/Clear';
-import { createTemporaryAsset } from '../services/AssetService';
+import { uploadAssets } from '../services/AssetService';
 
 const CSVUpload = () => {
   const [parsedData, setParsedData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Parse CSV data and handle any errors
   const parseCSV = (csvData) => {
     try {
       const parsed = Papa.parse(csvData, {
         header: true,
         skipEmptyLines: true,
+        delimiter: ',', // Default delimiter
+        quoteChar: '"',
+        escapeChar: '"',
       });
       if (parsed.errors.length > 0) {
         console.error("CSV Parsing Error:", parsed.errors);
@@ -45,47 +47,86 @@ const CSVUpload = () => {
     }
   };
 
-  // Handle CSV file upload
+  const parseNestedCSV = (str) => {
+    if (!str || str.trim() === '') return [];
+    // Use Papa.parse to parse the nested CSV string
+    const parsed = Papa.parse(str, {
+      delimiter: ',', // Assuming commas are used to separate entries
+      quoteChar: '"',
+      escapeChar: '"',
+    });
+    // Flatten the parsed data and trim whitespace
+    return parsed.data.flat().map((item) => item.trim());
+  };
+
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     const reader = new FileReader();
     reader.onload = (e) => {
       const csvData = e.target.result;
-      const data = parseCSV(csvData); // Parse CSV and set state
+      const data = parseCSV(csvData);
       setParsedData(data);
     };
     reader.readAsText(file);
   };
 
-  // Submit parsed data to backend for each row
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      for (const row of parsedData) {
-        const payload = {
-          title: row.Title,
-          description: row.Description,
-          attributes: row.Attributes ? row.Attributes.split(',') : [], // Convert attributes to array if necessary
-        };
-        console.log("Payload being sent to createTemporaryAsset:", payload); // Debug log
-        await createTemporaryAsset(payload);
-      }
-      setSnackbar({ open: true, message: 'Assets created successfully!', severity: 'success' });
-      setParsedData([]); // Clear data after successful upload
-    } catch (error) {
-      console.error("Error submitting assets:", error);
-      setSnackbar({ open: true, message: 'Failed to create assets. Please try again.', severity: 'error' });
-    } finally {
-      setLoading(false);
-    }
-  };
+        const assets = parsedData.map((row) => {
+            // Retrieve or set default values for 'attributes' and 'att_desc'
+            const attributesField = row.attributes || row.Attributes || '';
+            const attDescField = row.att_desc || row.Att_desc || '';
 
-  // Clear uploaded data
+            // Parse the nested CSV for attributes and descriptions
+            const attributesArray = parseNestedCSV(attributesField);
+            const attDescArray = parseNestedCSV(attDescField);
+
+            // Ensure `attDescArray` matches the length of `attributesArray` by filling with empty strings if needed
+            while (attDescArray.length < attributesArray.length) {
+                attDescArray.push('');
+            }
+
+            // Log to verify correct parsing and alignment of arrays
+            console.log(`Asset Title: ${row.title || row.Title}`);
+            console.log('Attributes:', attributesArray);
+            console.log('Attribute Descriptions:', attDescArray);
+
+            return {
+                title: row.title || row.Title || '',
+                description: row.description || row.Description || '',
+                attributes: attributesArray,
+                att_desc: attDescArray,
+            };
+        });
+
+        // Log the final assets payload to be sent to the backend
+        console.log("Final payload being sent to backend:", assets);
+
+        const response = await uploadAssets(assets);
+
+        if (response.success) {
+            const uploadedAssetIds = response.created_assets.map(asset => asset.id); // Collect uploaded asset IDs
+            sessionStorage.setItem('newlyUploadedAssets', JSON.stringify(uploadedAssetIds)); // Save in sessionStorage
+            setSnackbar({ open: true, message: 'Assets created successfully!', severity: 'success' });
+            setParsedData([]);
+        } else {
+            console.error("Error uploading assets:", response.error || response.errors);
+            const errorMessage = response.error || (response.errors && response.errors.join(', ')) || 'Failed to create some assets.';
+            setSnackbar({ open: true, message: errorMessage, severity: 'warning' });
+        }
+    } catch (error) {
+        console.error("Error submitting assets:", error);
+        setSnackbar({ open: true, message: 'Failed to create assets. Please try again.', severity: 'error' });
+    } finally {
+        setLoading(false);
+    }
+};
+
   const handleClear = () => {
     setParsedData([]);
   };
 
-  // Close the snackbar
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
@@ -93,13 +134,12 @@ const CSVUpload = () => {
   return (
     <Paper elevation={3} sx={{ padding: 4, borderRadius: 2, mb: 4 }}>
       <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-        Upload CSV to Create Temporary Assets
+        Upload CSV to Create Assets in OpenMetadata
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ marginBottom: 2 }}>
-        Please upload a CSV file with fields: <strong>Title</strong>, <strong>Description</strong>, and <strong>Attributes</strong>.
+        Please upload a CSV file with fields: <strong>title</strong>, <strong>description</strong>, <strong>attributes</strong>, and <strong>att_desc</strong>.
       </Typography>
 
-      {/* File upload section */}
       <Box display="flex" alignItems="center" gap={2} sx={{ marginBottom: 3 }}>
         <Button
           variant="outlined"
@@ -128,7 +168,6 @@ const CSVUpload = () => {
         )}
       </Box>
 
-      {/* Display parsed data preview */}
       {parsedData.length > 0 && (
         <Paper elevation={2} sx={{ padding: 2, marginBottom: 3, maxHeight: 200, overflowY: 'auto' }}>
           <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
@@ -139,11 +178,12 @@ const CSVUpload = () => {
             {parsedData.slice(0, 5).map((row, index) => (
               <ListItem key={index} sx={{ display: 'block' }}>
                 <ListItemText
-                  primary={`Title: ${row.Title}`}
+                  primary={`Title: ${row.title || row.Title}`}
                   secondary={
                     <>
-                      <Typography variant="body2"><strong>Description:</strong> {row.Description}</Typography>
-                      <Typography variant="body2"><strong>Attributes:</strong> {row.Attributes}</Typography>
+                      <Typography variant="body2"><strong>Description:</strong> {row.description || row.Description}</Typography>
+                      <Typography variant="body2"><strong>Attributes:</strong> {row.attributes || row.Attributes}</Typography>
+                      <Typography variant="body2"><strong>Attribute Descriptions:</strong> {row.att_desc || row.Att_desc}</Typography>
                     </>
                   }
                 />
@@ -159,13 +199,12 @@ const CSVUpload = () => {
         </Paper>
       )}
 
-      {/* Submit button */}
       {loading ? (
         <CircularProgress />
       ) : (
         parsedData.length > 0 && (
           <Button variant="contained" color="primary" onClick={handleSubmit} sx={{ marginTop: 2 }}>
-            Submit to Backend
+            Submit to OpenMetadata
           </Button>
         )
       )}

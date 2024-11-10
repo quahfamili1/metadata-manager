@@ -13,20 +13,24 @@ import {
   Tooltip
 } from '@mui/material';
 import { getTeamAssets } from '../services/AssetService';
-import CSVUpload from '../components/CSVUpload'; // Import CSVUpload component
+import CSVUpload from '../components/CSVUpload';
 
 const AssetManagementPage = () => {
   const [ownedAssets, setOwnedAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [newlyUploadedAssets, setNewlyUploadedAssets] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Fetch stored asset IDs for newly uploaded assets
+    const newAssets = JSON.parse(sessionStorage.getItem('newlyUploadedAssets') || '[]');
+    setNewlyUploadedAssets(newAssets);
+
     const fetchOwnedAssets = async () => {
       setLoading(true);
       try {
         const teamName = sessionStorage.getItem('teamName');
-        console.log("Team name from session:", teamName);  // Add this line to verify the value
         if (!teamName) {
           console.error('Team name is missing or not set.');
           setError(true);
@@ -45,7 +49,6 @@ const AssetManagementPage = () => {
   
     fetchOwnedAssets();
   }, []);
-  
 
   const handleViewSuggestions = (assetId) => {
     navigate(`/suggestions/${assetId}`);
@@ -83,55 +86,68 @@ const AssetManagementPage = () => {
         <Typography>No owned assets found.</Typography>
       ) : (
         <List sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-          {ownedAssets.map((asset) => (
-            <ListItem key={asset.id} sx={{ width: { xs: '100%', sm: '48%', md: '30%' }, marginBottom: 2 }}>
-              <Paper elevation={2} sx={{ padding: 2, width: '100%' }}>
-                <Tooltip title={asset.display_name || 'Unnamed Asset'}>
-                  <ListItemText
-                    primary={
-                      <Typography
-                        variant="h6"
-                        component="span"
-                        sx={{
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: 'block',
-                          maxWidth: '100%',
-                          wordBreak: 'break-all',
-                        }}
-                      >
-                        {asset.display_name || 'Unnamed Asset'}
-                      </Typography>
-                    }
-                    secondary={
-                      <>
-                        <Typography variant="body2" component="span">
-                          <strong>Type:</strong> {asset.type || 'N/A'}
-                        </Typography>
-                        <br />
-                        <Typography variant="body2" component="span">
-                          <strong>Description:</strong> {asset.description || 'No description available'}
-                        </Typography>
-                        <br />
-                        <Typography variant="body2" component="span">
-                          <strong>Last updated:</strong> {new Date(asset.updated_at).toLocaleString()}
-                        </Typography>
-                      </>
-                    }
-                  />
-                </Tooltip>
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  onClick={() => handleViewSuggestions(asset.id)}
-                  sx={{ marginTop: 2 }}
+          {ownedAssets.map((asset) => {
+            const isNew = newlyUploadedAssets.includes(asset.id); // Check if asset is new
+
+            return (
+              <ListItem key={asset.id} sx={{ width: { xs: '100%', sm: '48%', md: '30%' }, marginBottom: 2 }}>
+                <Paper
+                  elevation={2}
+                  sx={{
+                    padding: 2,
+                    width: '100%',
+                    backgroundColor: isNew ? '#e0f7e0 !important' : 'inherit', // Light green background for new assets
+                    border: isNew ? '2px solid #4CAF50' : 'none', // Green border for better visual cue
+                    boxShadow: isNew ? '0px 0px 8px rgba(76, 175, 80, 0.5)' : 'none' // Additional shadow for prominence
+                  }}
                 >
-                  View Metadata Suggestions
-                </Button>
-              </Paper>
-            </ListItem>
-          ))}
+                  <Tooltip title={asset.display_name || 'Unnamed Asset'}>
+                    <ListItemText
+                      primary={
+                        <Typography
+                          variant="h6"
+                          component="span"
+                          sx={{
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: 'block',
+                            maxWidth: '100%',
+                            wordBreak: 'break-all',
+                          }}
+                        >
+                          {asset.display_name || 'Unnamed Asset'}
+                        </Typography>
+                      }
+                      secondary={
+                        <>
+                          <Typography variant="body2" component="span">
+                            <strong>Type:</strong> {asset.type || 'N/A'}
+                          </Typography>
+                          <br />
+                          <Typography variant="body2" component="span">
+                            <strong>Description:</strong> {asset.description || 'No description available'}
+                          </Typography>
+                          <br />
+                          <Typography variant="body2" component="span">
+                            <strong>Last updated:</strong> {new Date(asset.updated_at).toLocaleString()}
+                          </Typography>
+                        </>
+                      }
+                    />
+                  </Tooltip>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={() => handleViewSuggestions(asset.id)}
+                    sx={{ marginTop: 2 }}
+                  >
+                    View Metadata Suggestions
+                  </Button>
+                </Paper>
+              </ListItem>
+            );
+          })}
         </List>
       )}
     </Box>

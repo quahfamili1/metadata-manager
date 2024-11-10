@@ -1,5 +1,3 @@
-// src/components/ClaimAssetsPage.js
-
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -14,7 +12,8 @@ import {
   Tooltip,
   CircularProgress
 } from '@mui/material';
-import { fetchUnownedAssets, updateAsset } from '../services/AssetService';
+import { fetchUnownedAssets, claimAsset } from '../services/AssetService';
+import { Link as RouterLink } from 'react-router-dom';
 
 const OPENMETADATA_URL = "http://localhost:8585"; // Replace with your actual OpenMetadata URL
 
@@ -34,7 +33,7 @@ const singularTypeMap = {
 const ClaimAssetsPage = () => {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success', assetId: '' });
 
   const fetchAssets = async () => {
     setLoading(true);
@@ -58,7 +57,7 @@ const ClaimAssetsPage = () => {
   }, []);
 
   const constructHref = (type, fullyQualifiedName) => {
-    const singularType = singularTypeMap[type] || type; // Map plural to singular type
+    const singularType = singularTypeMap[type] || type;
     return `${OPENMETADATA_URL}/${singularType}/${fullyQualifiedName}`;
   };
 
@@ -67,16 +66,14 @@ const ClaimAssetsPage = () => {
     if (!confirmClaim) return;
 
     try {
-      const updateData = { owners: true };
-      console.log("Attempting to claim asset with ID:", assetId, "and Type:", assetType);
-  
-      const response = await updateAsset(assetType, assetId, updateData);
-      
+      const response = await claimAsset(assetId, assetType);
+
       if (response.success) {
         setSnackbar({
           open: true,
-          message: `Successfully claimed asset ID ${assetId}`,
-          severity: 'success'
+          message: `Successfully claimed asset ID ${assetId}. Click to add metadata.`,
+          severity: 'success',
+          assetId: assetId // Pass assetId for linking
         });
         setAssets(assets.filter(asset => asset.id !== assetId));
       } else {
@@ -91,7 +88,7 @@ const ClaimAssetsPage = () => {
       console.error('Error claiming asset:', error);
     }
   };
-  
+
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
@@ -188,7 +185,24 @@ const ClaimAssetsPage = () => {
           }
         }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+          action={
+            snackbar.severity === 'success' ? (
+              <Button
+                component={RouterLink}
+                to={`/suggestions/${snackbar.assetId}`}
+                color="inherit"
+                size="small"
+                style={{ textDecoration: 'underline' }}
+              >
+                Add Metadata
+              </Button>
+            ) : null
+          }
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
